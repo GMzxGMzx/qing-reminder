@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>轻提醒</title>
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-soft: #eef2ff;
+    --success: #059669;
+    --success-soft: #ecfdf5;
+    --warn: #d97706;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: rgba(148, 163, 184, .28);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: transparent; color: var(--text); overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    -webkit-font-smoothing: antialiased; user-select: none;
+  }
+  .window {
+    width: 100%; height: 100%; display: flex; flex-direction: column;
+    background: rgba(255, 255, 255, .86);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, .65); border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, .22); overflow: hidden;
+  }
+  .titlebar {
+    height: 34px; flex: none; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 10px 0 13px; background: rgba(255, 255, 255, .38);
+    border-bottom: 1px solid rgba(148, 163, 184, .16);
+    -webkit-app-region: drag; cursor: move;
+  }
+  body.locked .titlebar { -webkit-app-region: no-drag; cursor: default; }
+  .brand-mini { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: #475569; }
+  .brand-mini .logo { font-size: 14px; }
+  .win-controls { display: flex; gap: 4px; -webkit-app-region: no-drag; }
+  .win-controls button {
+    width: 22px; height: 22px; border: none; border-radius: 6px; background: transparent;
+    color: #64748b; font-size: 13px; line-height: 1; cursor: pointer; display: grid; place-items: center;
+  }
+  .win-controls button:hover { background: rgba(148, 163, 184, .22); color: #1e293b; }
+  .win-controls button.close:hover { background: #fee2e2; color: #dc2626; }
+  .view { flex: 1; min-height: 0; display: none; }
+  body.compact #compactView { display: block; }
+  body.expanded #expandedView { display: block; }
+  body.alert #alertOverlay { display: flex; }
+
+  /* ---------- 小窗 ---------- */
+  #compactView { padding: 10px 13px 8px; position: relative; display: flex; flex-direction: column; gap: 5px; }
+  .compact-head { display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: .3px; }
+  .compact-list { display: flex; flex-direction: column; gap: 5px; flex: 1; min-height: 0; }
+  .compact-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px; align-items: center;
+    background: rgba(255, 255, 255, .55); border: 1px solid var(--border);
+    border-radius: 9px; padding: 6px 8px;
+  }
+  .compact-row.due { border-color: #fcd34d; background: #fffbeb; }
+  .compact-name { font-size: 11px; font-weight: 700; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .compact-name small { display: block; font-size: 9px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+  .compact-count { font-size: 14px; font-weight: 750; font-variant-numeric: tabular-nums; color: var(--primary); white-space: nowrap; }
+  .compact-count.due { color: var(--warn); }
+  .compact-done {
+    border: none; background: var(--success-soft); color: var(--success); border-radius: 6px;
+    padding: 4px 7px; font-size: 10px; font-weight: 700; cursor: pointer;
+  }
+  .compact-done:hover { background: #d1fae5; }
+  .compact-empty { text-align: center; padding: 42px 0 18px; }
+  .compact-empty p { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+  .compact-empty button {
+    border: none; background: var(--primary-soft); color: var(--primary); font-weight: 700;
+    border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 12px;
+  }
+  .compact-foot { font-size: 9px; color: var(--muted); text-align: center; padding-top: 2px; }
+
+  /* ---------- 展开窗 ---------- */
+  #expandedView { padding: 14px 16px; overflow: auto; }
+  .expanded-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; height: 100%; }
+  .col { min-width: 0; display: flex; flex-direction: column; gap: 10px; overflow: auto; padding-right: 2px; }
+  .section-title { font-size: 12px; font-weight: 750; margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  .section-title .hint { font-size: 10px; color: var(--muted); font-weight: 500; }
+  .card {
+    background: rgba(255, 255, 255, .62); border: 1px solid var(--border);
+    border-radius: 11px; padding: 11px 12px;
+  }
+  .form-row { display: flex; gap: 7px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 10px; color: var(--muted); font-weight: 700; }
+  .field input {
+    height: 32px; border: 1px solid var(--border); border-radius: 7px; padding: 0 9px;
+    font-size: 12px; outline: none; background: rgba(255,255,255,.8); font-family: inherit;
+  }
+  .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(79,70,229,.12); }
+  .field.grow { flex: 1 1 150px; }
+  .field.num { flex: 0 0 92px; }
+  .btn {
+    border: 1px solid var(--border); background: rgba(255,255,255,.75); color: var(--text);
+    border-radius: 7px; padding: 7px 10px; font-size: 11px; cursor: pointer; font-family: inherit; font-weight: 600;
+  }
+  .btn:hover { background: #fff; border-color: #cbd5e1; }
+  .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn-primary:hover { background: #4338ca; }
+  .btn-success { color: var(--success); border-color: #a7f3d0; background: var(--success-soft); }
+  .btn-danger { color: #dc2626; border-color: transparent; background: transparent; }
+  .btn-sm { padding: 5px 8px; font-size: 10px; }
+  .event-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+    border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; margin-bottom: 7px;
+    background: rgba(255,255,255,.55);
+  }
+  .event-row.paused { opacity: .6; }
+  .event-row.due { border-color: #fcd34d; background: #fffbeb; }
+  .ev-name { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .ev-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex: none; }
+  .ev-dot.paused { background: #94a3b8; }
+  .ev-dot.due { background: var(--warn); }
+  .ev-info { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .ev-time { font-size: 16px; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .ev-time.due { color: var(--warn); }
+  .ev-actions { display: flex; gap: 4px; align-items: center; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { background: rgba(255,255,255,.6); border: 1px solid var(--border); border-radius: 9px; padding: 8px 9px; }
+  .stat span { display: block; font-size: 9px; color: var(--muted); }
+  .stat strong { font-size: 19px; font-variant-numeric: tabular-nums; }
+  .history-item { display: flex; align-items: center; gap: 8px; padding: 7px 1px; border-bottom: 1px solid rgba(148,163,184,.16); }
+  .history-item:last-child { border-bottom: none; }
+  .history-check { width: 20px; height: 20px; border-radius: 50%; background: var(--success-soft); color: var(--success); display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: none; }
+  .history-info { flex: 1; min-width: 0; }
+  .history-info strong { display: block; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-info span { font-size: 9px; color: var(--muted); }
+  .link-btn { border: none; background: none; color: var(--primary); font-size: 10px; cursor: pointer; padding: 2px; font-family: inherit; }
+  .link-btn:hover { text-decoration: underline; }
+  .empty-small { text-align: center; color: var(--muted); font-size: 11px; padding: 14px 0; }
+  .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; margin-bottom: 9px; }
+  .setting-row:last-child { margin-bottom: 0; }
+  .setting-row input[type=range] { width: 130px; accent-color: var(--primary); }
+  .switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: var(--muted); }
+  .switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .switch .track { width: 30px; height: 17px; background: #cbd5e1; border-radius: 999px; position: relative; transition: background .2s; }
+  .switch .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; background: #fff; border-radius: 50%; transition: transform .2s; }
+  .switch input:checked + .track { background: var(--primary); }
+  .switch input:checked + .track::after { transform: translateX(13px); }
+
+  /* ---------- 提醒弹窗 ---------- */
+  #alertOverlay {
+    display: none; position: absolute; inset: 0; z-index: 20;
+    background: rgba(15, 23, 42, .42); backdrop-filter: blur(3px);
+    align-items: center; justify-content: center; padding: 18px;
+  }
+  .alert-card {
+    width: 100%; max-width: 400px; background: #fff; border-radius: 18px;
+    padding: 22px 24px; text-align: center; box-shadow: 0 18px 50px rgba(0,0,0,.25);
+    animation: pop .25s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes pop { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .bell { width: 52px; height: 52px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; font-size: 26px; margin: 0 auto 12px; animation: ring 1.4s ease-in-out infinite; }
+  @keyframes ring { 0%,100%{transform:rotate(0)} 20%{transform:rotate(-12deg)} 40%{transform:rotate(10deg)} 60%{transform:rotate(-6deg)} 80%{transform:rotate(4deg)} }
+  .alert-card h2 { margin: 0 0 5px; font-size: 19px; }
+  .alert-event { font-size: 17px; font-weight: 750; color: var(--primary); margin-bottom: 6px; word-break: break-word; }
+  .alert-meta { font-size: 10px; color: var(--muted); margin-bottom: 16px; }
+  .alert-card .btn-primary { width: 100%; padding: 10px; font-size: 13px; margin-bottom: 8px; }
+  .snooze-row { display: flex; gap: 8px; }
+  .snooze-row .btn { flex: 1; }
+  .alert-foot { margin-top: 13px; border-top: 1px solid var(--border); padding-top: 10px; }
+</style>
+</head>
+<body class="compact">
+<div class="window">
+  <div class="titlebar">
+    <div class="brand-mini"><span class="logo">⏰</span><span>轻提醒</span></div>
+    <div class="win-controls">
+      <button data-action="expand" title="展开 / 收起">▢</button>
+      <button data-action="hide" title="隐藏到托盘">—</button>
+      <button class="close" data-action="quit" title="退出">×</button>
+    </div>
+  </div>
+
+  <div id="compactView" class="view">
+    <div class="compact-head"><span>最近的提醒</span><span id="compactMore"></span></div>
+    <div id="compactEmpty" class="compact-empty" style="display:none">
+      <p>还没有提醒事件</p>
+      <button data-action="expand">+ 添加提醒</button>
+    </div>
+    <div id="compactList" class="compact-list"></div>
+    <div class="compact-foot" id="compactFoot"></div>
+  </div>
+
+  <div id="expandedView" class="view">
+    <div class="expanded-grid">
+      <div class="col">
+        <div>
+          <h3 class="section-title">新建提醒 <span class="hint">间隔 1 分钟 ~ 7 天</span></h3>
+          <div class="card">
+            <form class="form-row" id="addForm">
+              <div class="field grow"><label>事件</label><input id="titleInput" maxlength="60" placeholder="例如：喝水" autocomplete="off"></div>
+              <div class="field num"><label>分钟</label><input type="number" id="intervalInput" value="30" min="1" max="10080"></div>
+              <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+          </div>
+        </div>
+        <div>
+          <h3 class="section-title">提醒列表 <span class="hint" id="activeHint"></span></h3>
+          <div id="eventList"></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="stats">
+          <div class="stat"><span>进行中</span><strong id="statActive">0</strong></div>
+          <div class="stat"><span>今日完成</span><strong id="statToday">0</strong></div>
+          <div class="stat"><span>累计完成</span><strong id="statTotal">0</strong></div>
+        </div>
+        <div>
+          <h3 class="section-title">完成历史 <span><button class="link-btn" data-action="clear-history">清空</button></span></h3>
+          <div class="card" id="historyList"></div>
+        </div>
+        <div>
+          <h3 class="section-title">窗口设置</h3>
+          <div class="card">
+            <div class="setting-row"><span>透明度</span><input type="range" id="opacityRange" min="40" max="100" value="86"></div>
+            <div class="setting-row"><span>窗口置顶</span><label class="switch"><input type="checkbox" id="topToggle" checked><span class="track"></span></label></div>
+            <div class="setting-row"><span>锁定位置</span><label class="switch"><input type="checkbox" id="lockToggle"><span class="track"></span></label></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="alertOverlay">
+    <div class="alert-card">
+      <div class="bell">🔔</div>
+      <h2>到时间啦！</h2>
+      <div class="alert-event" id="aTitle"></div>
+      <div class="alert-meta" id="aMeta"></div>
+      <button class="btn btn-primary" data-action="confirm">✓ 确认完成</button>
+      <div class="snooze-row">
+        <button class="btn" data-action="snooze" data-min="5">5 分钟后再提醒</button>
+        <button class="btn" data-action="snooze" data-min="15">15 分钟后再提醒</button>
+      </div>
+      <div class="alert-foot"><button class="link-btn" data-action="end">结束这个提醒</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const { ipcRenderer } = require('electron');
+
+  const KEY = 'qing-reminder-desktop-v1';
+  const state = loadState();
+  let alertQueue = [];
+  let currentAlert = null;
+  let mode = 'compact';
+  let restoreMode = 'compact';
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function loadState() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (e) {}
+    let p = null;
+    if (raw) { try { p = JSON.parse(raw); } catch (e) {} }
+    if (!p || !Array.isArray(p.events)) p = { events: [], settings: { opacity: 86, alwaysOnTop: true, sound: true } };
+    if (!p.settings) p.settings = { opacity: 86, alwaysOnTop: true, sound: true };
+    p.events.forEach(function (ev) {
+      if (!Array.isArray(ev.history)) ev.history = [];
+      if (!ev.intervalMs || ev.intervalMs < 60000) ev.intervalMs = 1800000;
+      if (typeof ev.nextDue !== 'number') ev.nextDue = Date.now() + ev.intervalMs;
+    });
+    return p;
+  }
+  function saveState() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function fmtCountdown(ms) {
+    if (ms <= 0) return '现在该做了';
+    const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    if (h) return h + '时' + pad(m) + '分' + pad(sec) + '秒';
+    if (m) return m + '分' + pad(sec) + '秒';
+    return sec + '秒';
+  }
+  function fmtClock(t) { const d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function fmtDateTime(t) {
+    const d = new Date(t);
+    return pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+  function fmtInterval(ms) {
+    const m = Math.round(ms / 60000);
+    return (m >= 60 && m % 60 === 0) ? (m / 60) + ' 小时' : m + ' 分钟';
+  }
+  function isToday(t) { const a = new Date(t), b = new Date(); return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+  function find(id) { return state.events.find(function (e) { return e.id === id; }) || null; }
+  function activeEvents() { return state.events.filter(function (e) { return !e.archived; }); }
+
+  function setMode(next) {
+    mode = next;
+    document.body.className = next + (document.body.classList.contains('locked') ? ' locked' : '');
+    ipcRenderer.send('set-mode', next);
+    if (next !== 'alert') restoreMode = next;
+    updateCompact();
+    updateExpanded();
+  }
+
+  function updateCompact() {
+    const items = activeEvents().filter(function (e) { return !e.paused; })
+      .sort(function (a, b) { return a.nextDue - b.nextDue; });
+    const empty = document.getElementById('compactEmpty');
+    const list = document.getElementById('compactList');
+    const foot = document.getElementById('compactFoot');
+    const more = document.getElementById('compactMore');
+    if (!items.length) {
+      empty.style.display = 'block'; list.style.display = 'none';
+      more.textContent = ''; foot.textContent = '';
+      return;
+    }
+    empty.style.display = 'none'; list.style.display = 'flex';
+    more.textContent = items.length + ' 个进行中';
+    foot.textContent = items.length > 5 ? '另有 ' + (items.length - 5) + ' 个，展开查看全部' : '';
+    const now = Date.now();
+    list.innerHTML = items.slice(0, 5).map(function (ev) {
+      const remain = ev.nextDue - now, due = remain <= 0;
+      return '<div class="compact-row' + (due ? ' due' : '') + '">' +
+        '<div class="compact-name">' + esc(ev.title) + '<small>每 ' + fmtInterval(ev.intervalMs) + ' · 完成 ' + ev.history.length + ' 次</small></div>' +
+        '<div class="compact-count' + (due ? ' due' : '') + '" data-countdown="' + ev.id + '">' + fmtCountdown(remain) + '</div>' +
+        '<button class="compact-done" data-action="complete-now" data-id="' + ev.id + '" title="立即完成">✓</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function updateCompactTimes() {
+    document.querySelectorAll('#compactList [data-countdown]').forEach(function (el) {
+      const ev = find(el.dataset.countdown);
+      if (!ev) return;
+      const remain = ev.nextDue - Date.now(), due = remain <= 0;
+      el.textContent = fmtCountdown(remain);
+      el.classList.toggle('due', due);
+      const row = el.closest('.compact-row');
+      if (row) row.classList.toggle('due', due);
+    });
+  }
+
+  function updateStats() {
+    const active = state.events.filter(function (e) { return !e.archived && !e.paused; });
+    let today = 0, total = 0;
+    state.events.forEach(function (e) { e.history.forEach(function (h) { total++; if (isToday(h.completedAt)) today++; }); });
+    document.getElementById('statActive').textContent = active.length;
+    document.getElementById('statToday').textContent = today;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('activeHint').textContent = '（' + active.length + ' 个进行中）';
+  }
+
+  function updateExpanded() {
+    updateStats();
+    const list = document.getElementById('eventList');
+    const items = activeEvents();
+    if (!items.length) {
+      list.innerHTML = '<div class="empty-small">暂无提醒，先在上方添加一个吧</div>';
+    } else {
+      list.innerHTML = items.map(function (ev) {
+        const remain = ev.nextDue - Date.now();
+        const cls = 'event-row' + (ev.paused ? ' paused' : '') + (!ev.paused && remain <= 0 ? ' due' : '');
+        const dot = ev.paused ? 'paused' : (remain <= 0 ? 'due' : '');
+        return '<div class="' + cls + '"><div><div class="ev-name"><span class="ev-dot ' + dot + '"></span>' + esc(ev.title) + '</div>' +
+          '<div class="ev-info">每 ' + fmtInterval(ev.intervalMs) + ' · 下次 ' + fmtClock(ev.nextDue) + ' · 完成 ' + ev.history.length + ' 次</div></div>' +
+          '<div class="ev-actions"><button class="btn btn-sm" data-action="pause" data-id="' + ev.id + '">' + (ev.paused ? '继续' : '暂停') + '</button>' +
+          '<button class="btn btn-sm btn-success" data-action="complete-now" data-id="' + ev.id + '">完成</button>' +
+          '<button class="btn btn-sm btn-danger" data-action="delete" data-id="' + ev.id + '">删</button></div></div>';
+      }).join('');
+    }
+
+    const records = [];
+    state.events.forEach(function (ev) { ev.history.forEach(function (h, i) { records.push({ ev: ev, at: h.completedAt, seq: i + 1 }); }); });
+    records.sort(function (a, b) { return b.at - a.at; });
+    const hb = document.getElementById('historyList');
+    hb.innerHTML = records.length ? records.slice(0, 40).map(function (r) {
+      return '<div class="history-item"><div class="history-check">✓</div><div class="history-info"><strong>' + esc(r.ev.title) + '</strong>' +
+        '<span>' + fmtDateTime(r.at) + '</span></div><span class="history-seq">第' + r.seq + '次</span></div>';
+    }).join('') : '<div class="empty-small">暂无完成记录</div>';
+  }
+
+  function updateAll() { updateCompact(); updateExpanded(); }
+
+  function tick() {
+    if (mode === 'compact') updateCompact(); else updateCompactTimes();
+    const now = Date.now(), changed = false;
+    state.events.forEach(function (ev) {
+      if (!ev.archived && !ev.paused && !ev.alerting && ev.nextDue <= now) {
+        ev.alerting = true; alertQueue.push(ev.id); changed = true;
+      }
+    });
+    if (changed) { saveState(); updateAll(); }
+    if (!currentAlert && alertQueue.length) showAlert();
+  }
+
+  function chime() {
+    if (!state.settings.sound) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AC();
+      [880, 1108.73, 1318.51].forEach(function (f, i) {
+        const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + i * 0.18;
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.18, t + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.55);
+      });
+      setTimeout(function () { ctx.close(); }, 1800);
+    } catch (e) {}
+  }
+
+  function showAlert() {
+    if (mode === 'alert') return;
+    const id = alertQueue.shift();
+    if (!id) return;
+    const ev = find(id);
+    if (!ev || ev.archived || ev.paused) { if (alertQueue.length) showAlert(); return; }
+    currentAlert = id;
+    restoreMode = mode === 'alert' ? 'compact' : mode;
+    document.getElementById('aTitle').textContent = ev.title;
+    document.getElementById('aMeta').textContent = '计划 ' + fmtDateTime(ev.nextDue) + ' · 每 ' + fmtInterval(ev.intervalMs) + ' 提醒一次';
+    setMode('alert');
+    chime();
+  }
+
+  function closeAlert() {
+    currentAlert = null;
+    setMode(restoreMode);
+    if (alertQueue.length) setTimeout(showAlert, 300);
+  }
+
+  function complete(id) {
+    const ev = find(id);
+    if (ev) {
+      ev.history.push({ completedAt: Date.now(), scheduledAt: ev.nextDue });
+      ev.nextDue = Date.now() + ev.intervalMs;
+      ev.alerting = false;
+      alertQueue = alertQueue.filter(function (x) { return x !== id; });
+      saveState(); updateAll();
+    }
+    if (currentAlert === id) closeAlert();
+  }
+
+  function snooze(id, minutes) {
+    const ev = find(id);
+    if (ev) { ev.nextDue = Date.now() + minutes * 60000; ev.alerting = false; saveState(); updateAll(); }
+    closeAlert();
+  }
+
+  document.getElementById('addForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const title = document.getElementById('titleInput').value.trim();
+    const min = parseInt(document.getElementById('intervalInput').value, 10);
+    if (!title) { alert('请输入事件名称'); return; }
+    if (!isFinite(min) || min < 1 || min > 10080) { alert('间隔需在 1 到 10080 分钟之间'); return; }
+    state.events.push({ id: uid(), title: title, intervalMs: min * 60000, createdAt: Date.now(), nextDue: Date.now() + min * 60000, paused: false, alerting: false, archived: false, history: [] });
+    saveState(); updateAll();
+    document.getElementById('titleInput').value = '';
+  });
+
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const a = btn.dataset.action, id = btn.dataset.id, ev = id ? find(id) : null;
+    if (a === 'expand') { setMode(mode === 'expanded' ? 'compact' : 'expanded'); }
+    else if (a === 'hide') { ipcRenderer.send('hide-window'); }
+    else if (a === 'quit') { ipcRenderer.send('quit-app'); }
+    else if (a === 'complete-compact') {
+      const sorted = activeEvents().filter(function (x) { return !x.paused; }).sort(function (x, y) { return x.nextDue - y.nextDue; });
+      if (currentAlert) complete(currentAlert); else if (sorted[0]) complete(sorted[0].id);
+    }
+    else if (a === 'pause' && ev) {
+      if (ev.paused) { ev.paused = false; ev.nextDue = Date.now() + (ev.remainingMs || ev.intervalMs); ev.remainingMs = null; }
+      else { ev.remainingMs = Math.max(0, ev.nextDue - Date.now()); ev.paused = true; ev.alerting = false; alertQueue = alertQueue.filter(function (x) { return x !== id; }); }
+      saveState(); updateAll();
+    }
+    else if (a === 'complete-now' && ev) { complete(id); }
+    else if (a === 'delete' && ev) {
+      if (confirm('确定删除「' + ev.title + '」及其历史吗？')) {
+        state.events = state.events.filter(function (x) { return x.id !== id; });
+        alertQueue = alertQueue.filter(function (x) { return x !== id; });
+        if (currentAlert === id) closeAlert();
+        saveState(); updateAll();
+      }
+    }
+    else if (a === 'clear-history') {
+      const total = state.events.reduce(function (n, e2) { return n + e2.history.length; }, 0);
+      if (total && confirm('确定清空所有完成历史吗？')) { state.events.forEach(function (e2) { e2.history = []; }); saveState(); updateAll(); }
+    }
+    else if (a === 'confirm' && currentAlert) { complete(currentAlert); }
+    else if (a === 'snooze' && currentAlert) { snooze(currentAlert, parseInt(btn.dataset.min, 10)); }
+    else if (a === 'end' && currentAlert) {
+      const target = find(currentAlert);
+      if (target) { target.archived = true; target.alerting = false; saveState(); updateAll(); }
+      closeAlert();
+    }
+  });
+
+  const opacityRange = document.getElementById('opacityRange');
+  const topToggle = document.getElementById('topToggle');
+  const lockToggle = document.getElementById('lockToggle');
+  opacityRange.value = state.settings.opacity || 86;
+  topToggle.checked = state.settings.alwaysOnTop !== false;
+  ipcRenderer.send('set-opacity', Number(opacityRange.value) / 100);
+  ipcRenderer.send('set-always-on-top', topToggle.checked);
+  opacityRange.addEventListener('input', function () {
+    state.settings.opacity = Number(this.value); saveState();
+    ipcRenderer.send('set-opacity', Number(this.value) / 100);
+  });
+  topToggle.addEventListener('change', function () {
+    state.settings.alwaysOnTop = this.checked; saveState();
+    ipcRenderer.send('set-always-on-top', this.checked);
+  });
+  lockToggle.addEventListener('change', function () {
+    document.body.classList.toggle('locked', this.checked);
+  });
+
+  // 生成托盘图标并注册
+  function trayIcon() {
+    const c = document.createElement('canvas'); c.width = 32; c.height = 32;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#4f46e5'; ctx.beginPath(); ctx.arc(16, 16, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(16, 8); ctx.lineTo(16, 16); ctx.lineTo(21, 19); ctx.stroke();
+    return c.toDataURL('image/png');
+  }
+  ipcRenderer.send('register-tray', trayIcon());
+
+  // 恢复未确认的提醒
+  state.events.forEach(function (ev) {
+    if (ev.alerting && !ev.archived && !ev.paused) { ev.nextDue = Date.now(); alertQueue.push(ev.id); }
+  });
+  if (alertQueue.length) saveState();
+
+  updateAll();
+  tick();
+  setInterval(tick, 500);
+})();
+</script>
+</body>
+</html>
