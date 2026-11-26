@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>轻提醒 · 电脑端提醒工具</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --surface-2: #f8fafc;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --primary-soft: #eef2ff;
+    --success: #059669;
+    --success-soft: #ecfdf5;
+    --warn: #d97706;
+    --danger: #dc2626;
+    --danger-soft: #fef2f2;
+    --shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { max-width: 1320px; margin: 0 auto; padding: 28px 32px 40px; }
+
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 20px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-icon {
+    width: 46px; height: 46px; border-radius: 14px;
+    background: linear-gradient(135deg, #6366f1, #4338ca);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: white;
+    box-shadow: 0 8px 20px rgba(79, 70, 229, .28);
+  }
+  .brand h1 { margin: 0; font-size: 22px; letter-spacing: -.3px; }
+  .brand p { margin: 3px 0 0; font-size: 13px; color: var(--muted); }
+  .topbar-right { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .running {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--success); background: var(--success-soft);
+    padding: 6px 12px; border-radius: 999px; font-weight: 600;
+  }
+  .running i { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px rgba(5,150,105,.14); }
+  .settings { display: flex; gap: 16px; align-items: center; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+  .switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .switch .track {
+    width: 36px; height: 20px; background: #cbd5e1; border-radius: 999px;
+    position: relative; transition: background .2s; flex: none;
+  }
+  .switch .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    background: #fff; border-radius: 50%; transition: transform .2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+  .switch input:checked + .track { background: var(--primary); }
+  .switch input:checked + .track::after { transform: translateX(16px); }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .stat span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .stat strong { font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1; }
+  .stat:nth-child(2) strong { color: var(--primary); }
+  .stat:nth-child(3) strong { color: var(--success); }
+
+  .composer {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 18px 20px; box-shadow: var(--shadow); margin-bottom: 20px;
+  }
+  .composer h2 { margin: 0 0 14px; font-size: 15px; }
+  .form-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 7px; }
+  .field label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .field input {
+    height: 42px; border: 1px solid var(--border); border-radius: 10px;
+    padding: 0 13px; font-size: 14px; outline: none; background: var(--surface-2);
+    transition: border-color .2s, box-shadow .2s; font-family: inherit;
+  }
+  .field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,.12); background: #fff; }
+  .field.title-field { flex: 1 1 260px; }
+  .field.interval-field { flex: 0 0 130px; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; }
+  .quick button {
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
+    border-radius: 8px; padding: 7px 9px; font-size: 12px; cursor: pointer;
+    transition: all .15s; font-family: inherit;
+  }
+  .quick button:hover { border-color: var(--primary); color: var(--primary); }
+  .quick button.active { background: var(--primary-soft); border-color: #c7d2fe; color: var(--primary); font-weight: 700; }
+
+  .btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    border-radius: 9px; padding: 9px 14px; font-size: 13px; cursor: pointer;
+    transition: all .15s; font-family: inherit; font-weight: 600; white-space: nowrap;
+  }
+  .btn:hover { border-color: #cbd5e1; background: var(--surface-2); }
+  .btn-primary {
+    background: var(--primary); border-color: var(--primary); color: #fff;
+    padding: 10px 22px; box-shadow: 0 4px 12px rgba(79,70,229,.25);
+  }
+  .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+  .btn-success { color: var(--success); border-color: #a7f3d0; background: var(--success-soft); }
+  .btn-success:hover { background: #d1fae5; border-color: #6ee7b7; }
+  .btn-danger-ghost { color: var(--danger); border-color: transparent; background: transparent; }
+  .btn-danger-ghost:hover { background: var(--danger-soft); border-color: #fecaca; }
+  .btn-sm { padding: 7px 11px; font-size: 12px; }
+  .btn-block { width: 100%; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(330px, 1fr); gap: 20px; align-items: start; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 18px 20px 20px; box-shadow: var(--shadow);
+  }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .panel-head h2 { margin: 0; font-size: 15px; }
+  .panel-head .sub { font-size: 12px; color: var(--muted); }
+  .link-btn { border: none; background: none; color: var(--primary); font-size: 12px; cursor: pointer; padding: 4px; font-family: inherit; }
+  .link-btn:hover { text-decoration: underline; }
+
+  .event-card {
+    border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px;
+    margin-bottom: 12px; display: grid; grid-template-columns: 1fr auto; gap: 14px;
+    background: linear-gradient(180deg, #fff, #fcfdff); transition: box-shadow .2s, border-color .2s;
+  }
+  .event-card:hover { box-shadow: 0 6px 18px rgba(15,23,42,.08); border-color: #cbd5e1; }
+  .event-card.paused { opacity: .62; }
+  .event-card.due { border-color: #fcd34d; background: #fffbeb; }
+  .event-title-row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--primary); box-shadow: 0 0 0 4px rgba(79,70,229,.12); }
+  .status-dot.dot-paused { background: #94a3b8; box-shadow: 0 0 0 4px rgba(148,163,184,.14); }
+  .status-dot.dot-due { background: var(--warn); box-shadow: 0 0 0 4px rgba(217,119,6,.15); }
+  .event-title-row h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  .badge { font-size: 11px; color: var(--primary); background: var(--primary-soft); padding: 3px 8px; border-radius: 999px; font-weight: 600; }
+  .countdown {
+    font-size: 27px; font-weight: 750; margin: 11px 0 8px; letter-spacing: -.5px;
+    font-variant-numeric: tabular-nums; color: #0f172a;
+  }
+  .countdown.due { color: var(--warn); }
+  .countdown.paused-text { color: var(--muted); font-size: 20px; }
+  .event-meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .event-actions { display: flex; flex-direction: column; gap: 7px; justify-content: center; }
+
+  .empty {
+    text-align: center; padding: 44px 16px; color: var(--muted); font-size: 13px;
+    border: 1px dashed var(--border); border-radius: 14px; background: var(--surface-2);
+  }
+  .empty .empty-icon { font-size: 34px; margin-bottom: 10px; opacity: .75; }
+  .empty strong { display: block; color: var(--text); font-size: 14px; margin-bottom: 5px; }
+
+  select {
+    height: 30px; border: 1px solid var(--border); background: var(--surface-2);
+    border-radius: 8px; padding: 0 8px; font-size: 12px; color: var(--muted);
+    outline: none; font-family: inherit; max-width: 150px;
+  }
+  .history-item {
+    display: flex; align-items: center; gap: 11px; padding: 11px 2px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-check {
+    width: 28px; height: 28px; border-radius: 50%; flex: none;
+    background: var(--success-soft); color: var(--success);
+    display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+  }
+  .history-info { flex: 1; min-width: 0; }
+  .history-info strong { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-info span { font-size: 11px; color: var(--muted); }
+  .history-seq { font-size: 11px; color: var(--muted); background: var(--surface-2); padding: 3px 7px; border-radius: 6px; white-space: nowrap; }
+  .subhead { font-size: 12px; color: var(--muted); margin: 18px 0 8px; font-weight: 700; }
+  .archived-item {
+    display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+    background: var(--surface-2); border-radius: 9px; margin-bottom: 7px; font-size: 12px;
+  }
+  .archived-item span { flex: 1; color: var(--muted); }
+
+  .footnote { margin-top: 18px; font-size: 11px; color: #94a3b8; line-height: 1.7; }
+
+  .modal {
+    position: fixed; inset: 0; z-index: 100; background: rgba(15, 23, 42, .58);
+    backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .modal.hidden { display: none; }
+  .modal-card {
+    background: #fff; border-radius: 24px; padding: 34px 36px 28px;
+    width: min(500px, 100%); text-align: center; box-shadow: 0 24px 70px rgba(0,0,0,.28);
+    animation: pop .28s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes pop { from { transform: scale(.9) translateY(14px); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .bell {
+    width: 70px; height: 70px; margin: 0 auto 18px; border-radius: 50%;
+    background: var(--primary-soft); color: var(--primary);
+    display: flex; align-items: center; justify-content: center; font-size: 34px;
+    animation: ring 1.4s ease-in-out infinite;
+  }
+  @keyframes ring { 0%,100% { transform: rotate(0); } 20% { transform: rotate(-13deg); } 40% { transform: rotate(11deg); } 60% { transform: rotate(-7deg); } 80% { transform: rotate(5deg); } }
+  .modal-card h2 { margin: 0 0 8px; font-size: 24px; }
+  .modal-event { font-size: 20px; font-weight: 750; color: var(--primary); margin-bottom: 10px; word-break: break-word; }
+  .modal-meta { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+  .modal-actions { display: flex; flex-direction: column; gap: 9px; }
+  .snooze-row { display: flex; gap: 9px; }
+  .snooze-row .btn { flex: 1; }
+  .modal-foot { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+    .app { padding: 20px 16px 32px; }
+    .stats { gap: 10px; }
+  }
+  @media (max-width: 560px) {
+    .stats { grid-template-columns: 1fr; }
+    .event-card { grid-template-columns: 1fr; }
+    .event-actions { flex-direction: row; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-icon">⏰</div>
+      <div>
+        <h1>轻提醒</h1>
+        <p>按时提醒 · 手动确认 · 记录每一次完成</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="running"><i></i> 提醒服务已启动</span>
+      <div class="settings">
+        <label class="switch"><input type="checkbox" id="soundToggle" checked><span class="track"></span>提示音</label>
+        <label class="switch"><input type="checkbox" id="notifyToggle" checked><span class="track"></span>系统通知</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span>进行中的提醒</span><strong id="statActive">0</strong></div>
+    <div class="stat"><span>今日完成</span><strong id="statToday">0</strong></div>
+    <div class="stat"><span>累计完成</span><strong id="statTotal">0</strong></div>
+  </div>
+
+  <form class="composer" id="addForm">
+    <h2>新建提醒</h2>
+    <div class="form-row">
+      <div class="field title-field">
+        <label for="titleInput">事件名称</label>
+        <input type="text" id="titleInput" placeholder="例如：喝水、起身活动、整理笔记" maxlength="60" autocomplete="off">
+      </div>
+      <div class="field interval-field">
+        <label for="intervalInput">提醒间隔（分钟）</label>
+        <input type="number" id="intervalInput" value="30" min="1" max="10080" step="1">
+      </div>
+      <div class="quick" id="quickIntervals">
+        <button type="button" data-min="5">5 分钟</button>
+        <button type="button" data-min="15">15 分钟</button>
+        <button type="button" data-min="30" class="active">30 分钟</button>
+        <button type="button" data-min="60">1 小时</button>
+        <button type="button" data-min="120">2 小时</button>
+      </div>
+      <button type="submit" class="btn btn-primary">+ 添加提醒</button>
+    </div>
+  </form>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>提醒列表 <span class="sub" id="activeSub"></span></h2>
+      </div>
+      <div id="activeList"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>完成历史</h2>
+        <div style="display:flex;align-items:center;gap:8px">
+          <select id="historyFilter"></select>
+          <button class="link-btn" data-action="clear-history">清空</button>
+        </div>
+      </div>
+      <div id="historyList"></div>
+      <div id="archivedSection"></div>
+    </section>
+  </div>
+
+  <p class="footnote">数据保存在本机浏览器中，重新打开页面不会丢失。到点后会弹出确认窗口，需手动点击「确认完成」才会记录历史并开始下一轮；请保持页面打开以获得准时提醒。</p>
+</div>
+
+<div class="modal hidden" id="alertModal">
+  <div class="modal-card">
+    <div class="bell">🔔</div>
+    <h2>到时间啦！</h2>
+    <div class="modal-event" id="alertTitle"></div>
+    <div class="modal-meta" id="alertMeta"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary btn-block" data-action="confirm-complete" id="confirmBtn">✓ 确认完成</button>
+      <div class="snooze-row">
+        <button class="btn" data-action="snooze" data-min="5">5 分钟后再提醒</button>
+        <button class="btn" data-action="snooze" data-min="15">15 分钟后再提醒</button>
+      </div>
+      <div class="modal-foot">
+        <button class="link-btn" data-action="end-event">结束这个提醒</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORAGE_KEY = 'qing-reminder-v1';
+  var BASE_TITLE = '轻提醒 · 电脑端提醒工具';
+  var state = loadState();
+  var alertQueue = [];
+  var currentAlertId = null;
+  var titleTimer = null;
+  var audioCtx = null;
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function loadState() {
+    var raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+    var parsed = null;
+    if (raw) { try { parsed = JSON.parse(raw); } catch (e) {} }
+    if (!parsed || !Array.isArray(parsed.events)) {
+      parsed = { events: [], settings: { sound: true, notification: true } };
+    }
+    if (!parsed.settings) parsed.settings = { sound: true, notification: true };
+    parsed.events.forEach(function (ev) {
+      if (!Array.isArray(ev.history)) ev.history = [];
+      if (!ev.intervalMs || ev.intervalMs < 60000) ev.intervalMs = 1800000;
+      if (typeof ev.nextDue !== 'number') ev.nextDue = Date.now() + ev.intervalMs;
+    });
+    return parsed;
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function fmtCountdown(ms) {
+    if (ms <= 0) return '现在该做了';
+    var sec = Math.floor(ms / 1000);
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    if (h > 0) return h + ' 小时 ' + pad(m) + ' 分 ' + pad(s) + ' 秒';
+    if (m > 0) return m + ' 分 ' + pad(s) + ' 秒';
+    return s + ' 秒';
+  }
+  function fmtClock(ts) {
+    var d = new Date(ts);
+    return pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function fmtDateTime(ts) {
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    return pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function fmtInterval(ms) {
+    var min = Math.round(ms / 60000);
+    if (min >= 60 && min % 60 === 0) return (min / 60) + ' 小时';
+    return min + ' 分钟';
+  }
+  function isToday(ts) {
+    var a = new Date(ts), b = new Date();
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+  function findEvent(id) {
+    for (var i = 0; i < state.events.length; i++) if (state.events[i].id === id) return state.events[i];
+    return null;
+  }
+
+  function renderStats() {
+    var active = state.events.filter(function (e) { return !e.archived && !e.paused; });
+    var today = 0, total = 0;
+    state.events.forEach(function (e) {
+      e.history.forEach(function (h) { total++; if (isToday(h.completedAt)) today++; });
+    });
+    document.getElementById('statActive').textContent = active.length;
+    document.getElementById('statToday').textContent = today;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('activeSub').textContent = '（' + active.length + ' 个进行中）';
+  }
+
+  function renderActive() {
+    var list = document.getElementById('activeList');
+    var items = state.events.filter(function (e) { return !e.archived; });
+    if (!items.length) {
+      list.innerHTML = '<div class="empty"><div class="empty-icon">🗒️</div><strong>还没有提醒</strong>在上方输入事件名称和间隔，添加你的第一个提醒吧。</div>';
+      return;
+    }
+    list.innerHTML = items.map(function (ev) {
+      var remain = ev.nextDue - Date.now();
+      var cls = 'event-card' + (ev.paused ? ' paused' : '') + (!ev.paused && remain <= 0 ? ' due' : '');
+      var dot = ev.paused ? 'dot-paused' : (remain <= 0 ? 'dot-due' : '');
+      var cdown = ev.paused ? '已暂停' : fmtCountdown(remain);
+      return '<article class="' + cls + '" data-id="' + ev.id + '">' +
+        '<div class="event-main">' +
+          '<div class="event-title-row"><span class="status-dot ' + dot + '"></span><h3>' + esc(ev.title) + '</h3>' +
+          '<span class="badge">每 ' + fmtInterval(ev.intervalMs) + '</span></div>' +
+          '<div class="countdown ' + (ev.paused ? 'paused-text' : (remain <= 0 ? 'due' : '')) + '" data-countdown="' + ev.id + '">' + cdown + '</div>' +
+          '<div class="event-meta"><span>下次提醒 ' + fmtClock(ev.nextDue) + '</span>' +
+          '<span>已完成 ' + ev.history.length + ' 次</span><span>创建于 ' + fmtDate(ev.createdAt) + '</span></div>' +
+        '</div>' +
+        '<div class="event-actions">' +
+          '<button class="btn btn-sm" data-action="toggle-pause" data-id="' + ev.id + '">' + (ev.paused ? '▶ 继续' : '⏸ 暂停') + '</button>' +
+          '<button class="btn btn-sm btn-success" data-action="complete-now" data-id="' + ev.id + '">✓ 立即完成</button>' +
+          '<button class="btn btn-sm btn-danger-ghost" data-action="delete" data-id="' + ev.id + '">删除</button>' +
+        '</div>' +
+      '</article>';
+    }).join('');
+  }
+
+  function renderHistory() {
+    var select = document.getElementById('historyFilter');
+    var prev = select.value || 'all';
+    var options = '<option value="all">全部事件</option>';
+    state.events.forEach(function (ev) {
+      options += '<option value="' + ev.id + '">' + esc(ev.title) + '</option>';
+    });
+    select.innerHTML = options;
+    if (prev !== 'all' && findEvent(prev)) select.value = prev; else select.value = 'all';
+
+    var records = [];
+    state.events.forEach(function (ev) {
+      ev.history.forEach(function (h, idx) {
+        records.push({ ev: ev, at: h.completedAt, seq: idx + 1 });
+      });
+    });
+    records.sort(function (a, b) { return b.at - a.at; });
+    if (select.value !== 'all') {
+      records = records.filter(function (r) { return r.ev.id === select.value; });
+    }
+
+    var box = document.getElementById('historyList');
+    if (!records.length) {
+      box.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><strong>暂无完成记录</strong>每次手动确认后，这里会留下记录。</div>';
+    } else {
+      box.innerHTML = records.map(function (r) {
+        return '<div class="history-item"><div class="history-check">✓</div><div class="history-info">' +
+          '<strong>' + esc(r.ev.title) + '</strong><span>' + fmtDateTime(r.at) + '</span></div>' +
+          '<span class="history-seq">第 ' + r.seq + ' 次</span></div>';
+      }).join('');
+    }
+
+    var archived = state.events.filter(function (e) { return e.archived; });
+    var sec = document.getElementById('archivedSection');
+    if (archived.length) {
+      sec.innerHTML = '<div class="subhead">已结束的提醒</div>' + archived.map(function (ev) {
+        return '<div class="archived-item"><span>' + esc(ev.title) + ' · 完成 ' + ev.history.length + ' 次</span>' +
+          '<button class="link-btn" data-action="restore" data-id="' + ev.id + '">恢复</button></div>';
+      }).join('');
+    } else {
+      sec.innerHTML = '';
+    }
+  }
+
+  function render() {
+    renderStats();
+    renderActive();
+    renderHistory();
+  }
+
+  function tick() {
+    var now = Date.now();
+    document.querySelectorAll('[data-countdown]').forEach(function (el) {
+      var ev = findEvent(el.dataset.countdown);
+      if (!ev) return;
+      if (ev.paused) {
+        el.textContent = '已暂停';
+        el.classList.remove('due');
+      } else {
+        el.textContent = fmtCountdown(ev.nextDue - now);
+        el.classList.toggle('due', ev.nextDue <= now);
+      }
+    });
+    checkDue();
+  }
+
+  function checkDue() {
+    var now = Date.now(), changed = false;
+    state.events.forEach(function (ev) {
+      if (!ev.archived && !ev.paused && !ev.alerting && ev.nextDue <= now) {
+        ev.alerting = true;
+        alertQueue.push(ev.id);
+        changed = true;
+      }
+    });
+    if (changed) { saveState(); renderActive(); }
+    if (!currentAlertId && alertQueue.length) showNextAlert();
+  }
+
+  function playChime() {
+    if (!state.settings.sound) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      var notes = [880, 1108.73, 1318.51];
+      notes.forEach(function (freq, i) {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        var t = audioCtx.currentTime + i * 0.19;
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.6);
+      });
+    } catch (e) {}
+  }
+
+  function sendNotify(title, body) {
+    if (!state.settings.notification || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    try {
+      var n = new Notification(title, { body: body, tag: 'qing-reminder' });
+      n.onclick = function () { window.focus(); n.close(); };
+    } catch (e) {}
+  }
+
+  function startTitleFlash() {
+    if (titleTimer) return;
+    var on = false;
+    titleTimer = setInterval(function () {
+      document.title = on ? '🔔 待确认提醒！' : BASE_TITLE;
+      on = !on;
+    }, 700);
+  }
+  function stopTitleFlash() {
+    if (titleTimer) { clearInterval(titleTimer); titleTimer = null; }
+    document.title = BASE_TITLE;
+  }
+
+  function showNextAlert() {
+    var id = alertQueue.shift();
+    if (!id) { currentAlertId = null; return; }
+    var ev = findEvent(id);
+    if (!ev || ev.archived || ev.paused) {
+      currentAlertId = null;
+      if (alertQueue.length) showNextAlert();
+      return;
+    }
+    currentAlertId = id;
+    document.getElementById('alertTitle').textContent = ev.title;
+    document.getElementById('alertMeta').textContent = '计划提醒 ' + fmtDateTime(ev.nextDue) + ' · 每 ' + fmtInterval(ev.intervalMs) + ' 一次';
+    document.getElementById('alertModal').classList.remove('hidden');
+    playChime();
+    sendNotify('提醒：' + ev.title, '该完成这件事了，回到窗口手动确认。');
+    startTitleFlash();
+  }
+
+  function closeAlert() {
+    document.getElementById('alertModal').classList.add('hidden');
+    currentAlertId = null;
+    stopTitleFlash();
+    if (alertQueue.length) setTimeout(showNextAlert, 350);
+  }
+
+  function completeEvent(id, scheduledAt) {
+    var ev = findEvent(id);
+    if (ev) {
+      ev.history.push({ completedAt: Date.now(), scheduledAt: scheduledAt || ev.nextDue });
+      ev.nextDue = Date.now() + ev.intervalMs;
+      ev.alerting = false;
+      alertQueue = alertQueue.filter(function (x) { return x !== id; });
+      saveState();
+      render();
+    }
+    if (currentAlertId === id) closeAlert();
+  }
+
+  function snooze(id, minutes) {
+    var ev = findEvent(id);
+    if (ev) {
+      ev.nextDue = Date.now() + minutes * 60000;
+      ev.alerting = false;
+      saveState();
+      renderActive();
+    }
+    closeAlert();
+  }
+
+  // 添加提醒
+  document.getElementById('addForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var title = document.getElementById('titleInput').value.trim();
+    var min = parseInt(document.getElementById('intervalInput').value, 10);
+    if (!title) { alert('请输入事件名称'); document.getElementById('titleInput').focus(); return; }
+    if (!isFinite(min) || min < 1 || min > 10080) { alert('提醒间隔需在 1 到 10080 分钟之间'); return; }
+    state.events.push({
+      id: uid(),
+      title: title,
+      intervalMs: min * 60000,
+      createdAt: Date.now(),
+      nextDue: Date.now() + min * 60000,
+      paused: false,
+      alerting: false,
+      archived: false,
+      history: []
+    });
+    saveState();
+    render();
+    document.getElementById('titleInput').value = '';
+    document.getElementById('titleInput').focus();
+  });
+
+  // 快捷间隔
+  document.getElementById('quickIntervals').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-min]');
+    if (!btn) return;
+    document.getElementById('intervalInput').value = btn.dataset.min;
+    document.querySelectorAll('#quickIntervals button').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  });
+  document.getElementById('intervalInput').addEventListener('input', function () {
+    var v = this.value;
+    document.querySelectorAll('#quickIntervals button').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.min === v);
+    });
+  });
+
+  // 全局按钮事件委托
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    var id = btn.dataset.id;
+    var ev = id ? findEvent(id) : null;
+
+    if (action === 'toggle-pause' && ev) {
+      if (ev.paused) {
+        ev.paused = false;
+        ev.nextDue = Date.now() + (ev.remainingMs || ev.intervalMs);
+        ev.remainingMs = null;
+      } else {
+        ev.remainingMs = Math.max(0, ev.nextDue - Date.now());
+        ev.paused = true;
+        ev.alerting = false;
+        alertQueue = alertQueue.filter(function (x) { return x !== id; });
+        if (currentAlertId === id) closeAlert();
+      }
+      saveState(); render();
+    } else if (action === 'complete-now' && ev) {
+      completeEvent(id);
+    } else if (action === 'delete' && ev) {
+      if (confirm('确定删除「' + ev.title + '」吗？它的完成历史也会一并删除。')) {
+        state.events = state.events.filter(function (x) { return x.id !== id; });
+        alertQueue = alertQueue.filter(function (x) { return x !== id; });
+        if (currentAlertId === id) closeAlert();
+        saveState(); render();
+      }
+    } else if (action === 'clear-history') {
+      var total = state.events.reduce(function (n, e2) { return n + e2.history.length; }, 0);
+      if (!total) return;
+      if (confirm('确定清空所有完成历史吗？此操作不可恢复。')) {
+        state.events.forEach(function (e2) { e2.history = []; });
+        saveState(); render();
+      }
+    } else if (action === 'restore' && ev) {
+      ev.archived = false;
+      ev.paused = false;
+      ev.nextDue = Date.now() + ev.intervalMs;
+      saveState(); render();
+    } else if (action === 'confirm-complete' && currentAlertId) {
+      completeEvent(currentAlertId);
+    } else if (action === 'snooze' && currentAlertId) {
+      snooze(currentAlertId, parseInt(btn.dataset.min, 10));
+    } else if (action === 'end-event' && currentAlertId) {
+      var target = findEvent(currentAlertId);
+      if (target) {
+        target.archived = true;
+        target.alerting = false;
+        saveState(); render();
+      }
+      closeAlert();
+    }
+  });
+
+  document.getElementById('historyFilter').addEventListener('change', renderHistory);
+
+  // 设置开关
+  var soundToggle = document.getElementById('soundToggle');
+  var notifyToggle = document.getElementById('notifyToggle');
+  soundToggle.checked = !!state.settings.sound;
+  notifyToggle.checked = !!state.settings.notification;
+  soundToggle.addEventListener('change', function () {
+    state.settings.sound = this.checked; saveState();
+  });
+  notifyToggle.addEventListener('change', function () {
+    state.settings.notification = this.checked;
+    if (this.checked && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    saveState();
+  });
+
+  // 页面恢复时恢复之前未确认的提醒
+  state.events.forEach(function (ev) {
+    if (ev.alerting && !ev.archived && !ev.paused) {
+      ev.nextDue = Date.now();
+      alertQueue.push(ev.id);
+    }
+  });
+  if (alertQueue.length) saveState();
+
+  render();
+  tick();
+  setInterval(tick, 500);
+})();
+</script>
+</body>
+</html>
