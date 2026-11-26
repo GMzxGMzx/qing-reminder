@@ -1,0 +1,34 @@
+{
+  "name": "qing-reminder-desktop",
+  "version": "1.0.0",
+  "description": "轻提醒 Windows 桌面版 - 透明悬浮置顶小窗",
+  "main": "main.js",
+  "scripts": {
+    "start": "node start.js",
+    "dist": "electron-builder --win --x64"
+  },
+  "author": "GMzxGMzx",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "com.qingreminder.desktop",
+    "productName": "轻提醒",
+    "electronDist": "node_modules/electron/dist",
+    "files": [
+      "main.js",
+      "index.html",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}
