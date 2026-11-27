@@ -4,7 +4,10 @@
 
 ## 下载安装
 
-从 [Releases](https://github.com/GMzxGMzx/qing-reminder/releases) 下载 `qing-reminder-setup-1.0.0.exe` 安装包，双击安装即可。
+从 [Releases](https://github.com/GMzxGMzx/qing-reminder/releases) 下载：
+
+- `qing-reminder-setup-1.0.0.exe`：安装包，双击安装。
+- `qing-reminder-portable-1.0.0.zip`：免安装版，解压后双击 `轻提醒.exe` 即可，无需安装权限。
 
 > **未签名应用提示**：安装包未进行代码签名，Windows 11 的「智能应用控制」可能会拦截。可在「Windows 安全中心 → 应用和浏览器控制 → 智能应用控制」中关闭该防护后重试。关闭后无法重新开启，请自行确认可接受。
 
